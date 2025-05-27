@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interaktiver Lebenslauf - Nelson Ishag</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Grundlegende Typografie und Scrollbar-Styling für den dunklen Modus */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden; 
+            scroll-behavior: smooth;
+            background-color: #0A0A0A; /* Noch dunklerer Hintergrund, fast schwarz */
+            color: #F1F5F9; /* Helle Textfarbe (slate-100) */
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #181818; /* Dunklere Scrollbar-Spur */ }
+        ::-webkit-scrollbar-thumb { background: #0EA5E9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0284C7; }
+
+        /* Timeline-Elemente */
+        .timeline-item .content { 
+            max-height: 0; 
+            overflow: hidden; 
+            transition: max-height 0.7s ease-out; 
+        }
+        .timeline-item.open .content { 
+            max-height: 1000px; 
+        }
+        .timeline-item.open .fa-chevron-down { 
+            transform: rotate(180deg); 
+        }
+
+        /* Modale Fenster */
+        .modal { 
+            display: none; 
+            opacity: 0; 
+            transition: opacity 0.4s ease-out; 
+            backdrop-filter: blur(12px); /* Stärkerer Blur-Effekt */
+            background-color: rgba(0, 0, 0, 0.85); /* Dunkler, leicht transparenter Hintergrund */
+        }
+        .modal.open { 
+            display: flex; 
+            opacity: 1; 
+        }
+        .modal > div { 
+            transform: scale(0.9); 
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
+            background-color: #181818; /* Dunklerer Modal-Inhalt */
+            color: #F1F5F9; /* Heller Text im Modal */
+            border: 1px solid #333; /* Dezenter Rahmen */
+            box-shadow: 0 10px 30px rgba(0, 230, 255, 0.1), 0 0 0 1px rgba(0, 230, 255, 0.05); /* Subtiler Glow */
+        }
+        .modal.open > div { 
+            transform: scale(1); 
+        }
+
+        /* Chart-Container für Responsivität */
+        .chart-container { 
+            position: relative; 
+            width: 100%; 
+            max-width: 500px; 
+            margin-left: auto; 
+            margin-right: auto; 
+            height: 280px; 
+        }
+        @media (min-width: 768px) { 
+            .chart-container { height: 320px; } 
+        }
+
+        /* Sektionen-Fade-In beim Scrollen */
+        .section-fade-in {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+        .section-fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Navigationsleiste */
+        .nav-item { 
+            transition: color 0.3s ease, border-bottom 0.3s ease; 
+            padding-bottom: 4px;
+            border-bottom: 2px solid transparent; 
+            color: #E2E8F0; /* Hellerer Text für Nav-Items */
+            font-weight: 500; /* Leichter fetter */
+        }
+        .nav-item:hover, .nav-item.active { 
+            color: #0EA5E9; 
+            border-bottom-color: #0EA5E9; 
+        }
+
+        /* Projektkarten Hover-Effekte */
+        .project-card { 
+            transition: all 0.3s ease; 
+            background-color: #181818; /* Dunklerer Kartenhintergrund */
+            border: 1px solid #333; /* Dezenter Rahmen */
+            color: #F1F5F9; /* Heller Text */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); /* Weniger aggressiver Startschatten */
+        }
+        .project-card:hover .project-icon { 
+            transform: scale(1.15); 
+            transition: transform 0.3s ease-in-out; 
+            color: #0EA5E9; /* Icon-Farbe beim Hover */
+            text-shadow: 0 0 10px rgba(0, 230, 255, 0.7); /* Leichter Icon-Glow */
+        }
+        .project-icon { 
+            transition: transform 0.3s ease-in-out; 
+            color: #64748B; /* Standard Icon-Farbe (slate-500) */
+        }
+        .project-card:hover { 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.5), 0 0 0 2px #0EA5E9; /* Stärkerer Schatten und Akzentrand */
+            transform: translateY(-8px); 
+        }
+
+        /* Hero-Sektion Hintergrundanimation */
+        @keyframes subtle-gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .hero-bg-animated {
+            background: linear-gradient(270deg, #121212, #0A0A0A, #121212); /* Noch dunklerer Gradient */
+            background-size: 200% 200%;
+            animation: subtle-gradient-shift 20s ease infinite;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-bg-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.05; /* Noch subtiler */
+            z-index: -1;
+            filter: grayscale(30%) brightness(70%) contrast(120%); /* Bild-Filter */
+        }
+
+        /* Hero-Sektion Textanimation */
+        @keyframes headline-fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-headline { animation: headline-fade-in 1s ease-out forwards; }
+
+        /* Scroll-Fortschrittsanzeige */
+        #scroll-progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(to right, #0EA5E9, #38BDF8);
+            width: 0%;
+            z-index: 1000;
+            transition: width 0.1s linear;
+        }
+
+        /* Timeline-Punkt Puls-Effekt */
+        @keyframes pulse-dot {
+            0% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(14, 165, 233, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); }
+        }
+        .timeline-dot-pulse:hover { animation: pulse-dot 1.5s infinite; }
+
+        /* Skill-Karten Hover-Effekt */
+        .skill-card { 
+            transition: all 0.3s ease; 
+            background-color: #181818; /* Dunklerer Kartenhintergrund */
+            border: 1px solid #333; /* Dezenter Rahmen */
+            color: #F1F5F9; /* Heller Text */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .skill-card:hover {
+            background: linear-gradient(135deg, #181818, #222); /* Subtiler Gradient beim Hover */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4), 0 0 0 1px #0EA5E9; /* Stärkerer Schatten und Akzentrand */
+            transform: translateY(-5px);
+        }
+        .skill-card h3 {
+            color: #0EA5E9; /* Titel in Akzentfarbe */
+            border-bottom-color: #0EA5E9; /* Linie in Akzentfarbe */
+        }
+        .skill-card i {
+            color: #0EA5E9; /* Icons in Akzentfarbe */
+        }
+        .skill-card ul {
+            color: #CBD5E1; /* Hellerer Text für Listenpunkte */
+        }
+
+        /* Allgemeine Linienanimation für Titel */
+        @keyframes line-expand {
+            from { width: 0%; }
+            to { width: 100%; }
+        }
+        .animate-line-expand {
+            animation: line-expand 0.6s ease-out forwards;
+        }
+
+        /* Button-Styling */
+        .btn-primary {
+            background-color: #0EA5E9; /* sky-500 */
+            color: white;
+            padding: 1rem 2.5rem;
+            border-radius: 9999px; 
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(0, 230, 255, 0.3); /* Leichter Glow-Schatten */
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+        .btn-primary:hover {
+            background-color: #0284C7; /* sky-600 */
+            box-shadow: 0 8px 20px rgba(0, 230, 255, 0.5), 0 0 0 2px #0EA5E9;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background-color: #222; /* Dunkleres Grau */
+            color: #E2E8F0; /* Hellerer Text */
+            padding: 1rem 2.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            border: 1px solid #444; /* Dezenterer Rand */
+        }
+        .btn-secondary:hover {
+            background-color: #333; /* Noch dunkleres Grau */
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5), 0 0 0 2px #444;
+            transform: translateY(-2px);
+        }
+
+        /* Allgemeine Sektionen-Hintergründe */
+        main section {
+            background-color: #121212; /* Dunklerer Hintergrund für Sektionen */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4); /* Dezenter Schatten */
+            padding: 2.5rem; /* Etwas mehr Padding */
+            border: 1px solid #222; /* Dezenter Rahmen */
+        }
+        main section h2 {
+            color: #0EA5E9; /* Titel in Akzentfarbe */
+            font-weight: 800; /* Extra Bold */
+        }
+        main section p {
+            color: #CBD5E1; /* Hellerer Text für Absätze */
+        }
+        main section .text-slate-600 {
+            color: #CBD5E1; 
+        }
+        main section .text-slate-700 {
+            color: #E2E8F0; 
+        }
+        main section .text-slate-500 {
+            color: #94A3B8; 
+        }
+
+        /* Timeline-Karten */
+        .timeline-item .p-6 {
+            background-color: #181818; /* Dunklerer Hintergrund */
+            border: 1px solid #333; /* Dezenter Rahmen */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .timeline-item h3 {
+            color: #0EA5E9; /* Titel in Akzentfarbe */
+        }
+        .timeline-item .text-slate-500 {
+            color: #94A3B8; /* Datum/Ort in hellerem Grau */
+        }
+        .timeline-item .font-bold.text-sky-600 {
+            color: #0EA5E9; /* Akzentfarbe für Auszeichnungen */
+        }
+        .timeline-item .list-disc {
+            color: #E2E8F0; /* Hellerer Text für Listenpunkte */
+        }
+        .timeline-item .text-xs.text-sky-600 {
+            color: #0EA5E9; /* "Klicken für Details" in Akzentfarbe */
+        }
+        .timeline-item .absolute {
+            background-color: #0EA5E9; /* Timeline-Punkt in Akzentfarbe */
+            box-shadow: 0 0 0 2px #0EA5E9, 0 0 10px rgba(0, 230, 255, 0.5); /* Glow für Punkte */
+        }
+
+        /* Hero-Sektion spezifische Anpassungen */
+        #profil .bg-white {
+            background-color: rgba(18, 18, 18, 0.9); /* Dunklerer, leicht transparenter Kasten */
+            border: 1px solid #333;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6); /* Stärkerer Schatten */
+        }
+        #profil h2, #profil p {
+            color: #F1F5F9; 
+        }
+        #profil .text-sky-700 {
+            color: #0EA5E9; /* Akzentfarbe für Titel */
+            text-shadow: 0 0 8px rgba(0, 230, 255, 0.4); /* Leichter Text-Glow */
+        }
+        #profil .text-slate-700 {
+            color: #E2E8F0; 
+        }
+        #profil .text-slate-600 {
+            color: #CBD5E1; 
+        }
+        #profil .fa-3x {
+            color: #0EA5E9; /* Icons in Akzentfarbe */
+            text-shadow: 0 0 5px rgba(0, 230, 255, 0.5); /* Leichter Icon-Glow */
+        }
+        #profil .border-sky-500 {
+            border-color: #0EA5E9; 
+        }
+        #profil .ring-sky-200 {
+            --tw-ring-color: #38BDF8; 
+        }
+
+        /* Footer Anpassungen */
+        footer {
+            background-color: #121212; /* Dunklerer Footer */
+            color: #E2E8F0; /* Hellerer Text */
+            border-top: 1px solid #222;
+        }
+        footer .text-slate-400 {
+            color: #94A3B8; 
+        }
+
+        /* Chart.js Anpassungen für dunklen Modus */
+        #besucherzahlenChart {
+            background-color: #0A0A0A; /* Chart Hintergrund */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            border: 1px solid #222;
+        }
+        #besucherzahlenChart canvas {
+            background-color: transparent !important; /* Wichtig für Transparenz */
+        }
+
+        /* Bild-Harmonisierung für alle dynamisch geladenen Bilder */
+        .harmonized-image {
+            filter: grayscale(20%) brightness(80%) contrast(120%);
+            transition: filter 0.5s ease-out, opacity 0.8s ease-out;
+            opacity: 0; /* Startzustand für Fade-in */
+        }
+        .harmonized-image.loaded {
+            opacity: 1; /* Endzustand nach dem Laden */
+        }
+
+        /* Easter Egg Message Box */
+        .easter-egg-box {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #0EA5E9;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 230, 255, 0.4);
+            z-index: 1001;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .easter-egg-box.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .easter-egg-box .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        /* Motorrad-Icon für Easter Egg */
+        .motorcycle-icon-trigger {
+            cursor: pointer;
+            color: #0EA5E9;
+            margin-left: 8px;
+            transition: transform 0.2s ease-in-out;
+        }
+        .motorcycle-icon-trigger:hover {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="scroll-progress-bar"></div>
+
+    <header class="bg-slate-800 text-white p-4 sticky top-0 z-50 shadow-xl" style="background-color: #121212; border-bottom: 1px solid #222;">
+        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center">
+            <h1 class="text-2xl font-bold mb-2 md:mb-0">Nelson Ishag</h1>
+            <nav>
+                <ul class="flex flex-wrap justify-center space-x-4">
+                    <li><a href="#profil" class="nav-item">Profil</a></li>
+                    <li><a href="#bildung" class="nav-item">Bildung</a></li>
+                    <li><a href="#erfahrung" class="nav-item">Erfahrung</a></li>
+                    <li><a href="#projekte" class="nav-item">Projekte</a></li>
+                    <li><a href="#kompetenzen" class="nav-item">Kompetenzen</a></li>
+                    <li><a href="#extras" class="nav-item">Extras</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8">
+
+        <section id="profil" class="mb-24 section-fade-in min-h-[80vh] flex flex-col justify-center items-center hero-bg-animated rounded-lg p-8 shadow-inner relative">
+            <img id="hero-bg-image" src="" alt="Nelson Ishag - Toronto Skyline" class="hero-bg-image" data-parallax-speed="0.2">
+            <div class="text-center max-w-4xl bg-white bg-opacity-90 p-8 rounded-xl shadow-2xl relative z-10">
+                <img id="profile-picture" src="" alt="Nelson Ishag" class="w-36 h-36 md:w-48 md:h-48 rounded-full mx-auto mb-8 shadow-2xl border-4 border-sky-500 ring-4 ring-sky-200 object-cover harmonized-image">
+                <h2 class="text-4xl md:text-6xl font-extrabold text-sky-700 mb-4 leading-tight animate-headline" id="hero-headline">Nelson Ishag</h2>
+                <p class="text-xl md:text-3xl text-slate-700 font-medium mb-8 animate-headline" style="animation-delay: 0.3s;" id="hero-subtitle">Bewerbung Duales Studium Wirtschaftsinformatik</p>
+                
+                <p class="max-w-3xl mx-auto text-lg md:text-xl mb-10 leading-relaxed text-slate-600 animate-headline" style="animation-delay: 0.6s;">
+                    Hochmotivierter und analytischer Studienbewerber mit ausgeprägtem unternehmerischem Denken und einer tiefen Leidenschaft für die Schnittstelle von Wirtschaft und Technologie. Ich strebe ein Duales Studium in Wirtschaftsinformatik an, um mein fundiertes betriebswirtschaftliches Wissen mit praktischen IT-Fähigkeiten zu verbinden und innovative Lösungen für reale Geschäftsprozesse zu entwickeln. Meine autodidaktischen Programmierkenntnisse, mein Talent zur Prozessoptimierung und meine internationale Erfahrung qualifizieren mich ideal für die Herausforderungen der digitalen Transformation.
+                </p>
+                <div class="flex flex-wrap justify-center gap-6 mb-12 animate-headline" style="animation-delay: 0.9s;">
+                    <a href="mailto:nelson.ishag@example.com" class="text-sky-600 hover:text-sky-700 transition-colors duration-300 transform hover:scale-110" aria-label="E-Mail senden"><i class="fas fa-envelope fa-3x"></i></a>
+                    <a href="tel:+49123456789" class="text-sky-600 hover:text-sky-700 transition-colors duration-300 transform hover:scale-110" aria-label="Anrufen"><i class="fas fa-phone fa-3x"></i></a>
+                    <a href="https://www.linkedin.com/in/nelsonishag" target="_blank" rel="noopener noreferrer" class="text-sky-600 hover:text-sky-700 transition-colors duration-300 transform hover:scale-110" aria-label="LinkedIn Profil"><i class="fab fa-linkedin fa-3x"></i></a>
+                </div>
+                <div class="flex flex-col md:flex-row justify-center gap-4 animate-headline" style="animation-delay: 1.2s;">
+                     <a href="#projekte" class="btn-primary inline-block">Projekte entdecken <i class="fas fa-arrow-right ml-2"></i></a>
+                     <a href="#kompetenzen" class="btn-secondary inline-block">Meine Kompetenzen <i class="fas fa-cogs ml-2"></i></a>
+                </div>
+            </div>
+        </section>
+
+        <section id="bildung" class="mb-24 section-fade-in">
+            <h2 class="text-3xl md:text-4xl font-bold text-sky-700 mb-12 text-center relative pb-4">
+                Bildungsweg
+                <span class="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-sky-500 rounded-full animate-line-expand"></span>
+            </h2>
+            <p class="text-center text-slate-600 mb-12 max-w-3xl mx-auto text-lg leading-relaxed">Mein akademischer Werdegang spiegelt meine Zielstrebigkeit und mein Interesse an internationalen Geschäftspraktiken und Managementprinzipien wider. Jede Station hat wichtige Grundlagen für mein analytisches Denken und meine Problemlösungsfähigkeiten gelegt.</p>
+            <div class="relative border-l-4 border-sky-500 ml-6 md:ml-0 md:mx-auto md:max-w-3xl py-4">
+                <div class="mb-12 timeline-item cursor-pointer group" onclick="toggleTimelineItem(this)">
+                    <div class="absolute w-8 h-8 bg-sky-500 rounded-full -left-[18px] mt-1.5 border-4 border-white shadow-md group-hover:scale-110 transition-transform flex items-center justify-center timeline-dot-pulse">
+                        <i class="fas fa-graduation-cap text-white text-sm"></i>
+                    </div>
+                    <div class="ml-12 p-6 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:-translate-y-1">
+                        <h3 class="text-xl md:text-2xl font-semibold mb-1">International Business & Management Co-op Diploma</h3>
+                        <p class="text-sm text-slate-500 mb-3">Tamwood College, Toronto, Kanada | 08/2022 – 07/2023</p>
+                        <div class="content mt-2 leading-relaxed">
+                            <p class="font-bold text-sky-600 mb-2">Auszeichnung: Klassenbester des Jahrgangs</p>
+                            <p>Relevante Kursinhalte:</p>
+                            <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                                <li>International Management</li>
+                                <li>Project Management</li>
+                                <li>HR Management</li>
+                                <li>Foundations of Finance / Accounting</li>
+                                <li>Supply Chain Management</li>
+                                <li>Integrated Marketing</li>
+                            </ul>
+                            <div class="mt-4 text-center">
+                                <img class="timeline-image rounded-lg shadow-md mx-auto max-w-full h-auto object-contain harmonized-image" style="max-height: 250px;" data-image-key="nelsonCertificate" alt="Nelson Ishag mit Zertifikat in Kanada">
+                                <p class="text-xs text-slate-500 mt-2">Moment der Anerkennung: Mein Abschluss am Tamwood College.</p>
+                            </div>
+                        </div>
+                        <span class="text-xs text-sky-600 mt-4 inline-block font-medium">Klicken für Details <i class="fas fa-chevron-down ml-1 transition-transform group-hover:rotate-180"></i></span>
+                    </div>
+                </div>
+                <div class="mb-12 timeline-item cursor-pointer group" onclick="toggleTimelineItem(this)">
+                    <div class="absolute w-8 h-8 bg-sky-500 rounded-full -left-[18px] mt-1.5 border-4 border-white shadow-md group-hover:scale-110 transition-transform flex items-center justify-center timeline-dot-pulse">
+                        <i class="fas fa-school text-white text-sm"></i>
+                    </div>
+                    <div class="ml-12 p-6 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:-translate-y-1">
+                        <h3 class="text-xl md:text-2xl font-semibold mb-1">Allgemeine Hochschulreife (Abitur)</h3>
+                        <p class="text-sm text-slate-500 mb-3">Prismaschule Langenfeld | Abschluss: 13.06.2022</p>
+                        <div class="content mt-2 leading-relaxed">
+                            <p>Durchschnittsnote: 2,8</p>
+                            <p>Leistungskurse: Englisch, Biologie, Erziehungswissenschaft</p>
+                            <p>Projektkurs: "Internationale Begegnungen" (Erwerb des Cambridge CAE Zertifikats - Niveau C1)</p>
+                        </div>
+                         <span class="text-xs text-sky-600 mt-4 inline-block font-medium">Klicken für Details <i class="fas fa-chevron-down ml-1 transition-transform group-hover:rotate-180"></i></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="erfahrung" class="mb-24 section-fade-in">
+            <h2 class="text-3xl md:text-4xl font-bold text-sky-700 mb-12 text-center relative pb-4">
+                Berufserfahrung & Praktika
+                <span class="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-sky-500 rounded-full animate-line-expand"></span>
+            </h2>
+            <p class="text-center text-slate-600 mb-12 max-w-3xl mx-auto text-lg leading-relaxed">Durch vielfältige praktische Erfahrungen konnte ich meine theoretischen Kenntnisse anwenden, unternehmerisches Geschick beweisen und wertvolle Einblicke in verschiedene Arbeitsbereiche gewinnen. Besonders die Optimierung von Prozessen und der Umgang mit Kunden lagen mir am Herzen.</p>
+             <div class="relative border-l-4 border-sky-500 ml-6 md:ml-0 md:mx-auto md:max-w-3xl py-4">
+                <div class="mb-12 timeline-item cursor-pointer group" onclick="toggleTimelineItem(this)">
+                    <div class="absolute w-8 h-8 bg-sky-500 rounded-full -left-[18px] mt-1.5 border-4 border-white shadow-md group-hover:scale-110 transition-transform flex items-center justify-center timeline-dot-pulse">
+                        <i class="fas fa-briefcase text-white text-sm"></i>
+                    </div>
+                    <div class="ml-12 p-6 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:-translate-y-1">
+                        <h3 class="text-xl md:text-2xl font-semibold mb-1">Co-op Work Experience</h3>
+                        <p class="text-sm text-slate-500 mb-3">Kanada | 01/2023 – 07/2023</p>
+                        <div class="content mt-2 leading-relaxed">
+                            <p>Umfang: 480 Stunden</p>
+                            <p>Tätigkeiten: Unterstützung bei der Datenanalyse, Mitarbeit an IT-Projekten, Kundenbetreuung im digitalen Umfeld. (Beispielhafte Tätigkeiten, bitte anpassen!)</p>
+                        </div>
+                        <span class="text-xs text-sky-600 mt-4 inline-block font-medium">Klicken für Details <i class="fas fa-chevron-down ml-1 transition-transform group-hover:rotate-180"></i></span>
+                    </div>
+                </div>
+                <div class="mb-12 timeline-item cursor-pointer group" onclick="toggleTimelineItem(this)">
+                    <div class="absolute w-8 h-8 bg-sky-500 rounded-full -left-[18px] mt-1.5 border-4 border-white shadow-md group-hover:scale-110 transition-transform flex items-center justify-center timeline-dot-pulse">
+                        <i class="fas fa-clinic-medical text-white text-sm"></i>
+                    </div>
+                    <div class="ml-12 p-6 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:-translate-y-1">
+                        <h3 class="text-xl md:text-2xl font-semibold mb-1">Mitarbeiter im Testzentrum</h3>
+                        <p class="text-sm text-slate-500 mb-3">BE DENTAL, Langenfeld | 06/2021 – 06/2022</p>
+                        <div class="content mt-2 leading-relaxed">
+                            <p class="font-semibold text-sky-600 mb-2">Die Herausforderung meistern: Wie ich die Besucherzahlen im Testzentrum drastisch steigerte.</p>
+                            <ul class="list-disc list-inside ml-4 space-y-1 mb-4">
+                                <li>**Steigerung der täglichen Besucherzahlen von 70-90 auf 150-200** durch Entwicklung und Implementierung eines datenbasierten Marketing-Proposals (Schilder, Online-Marketing, CRM-Systeme).</li>
+                                <li>Übernahme der Leitung des Testzentrums für zwei Wochen während der Corona-Pandemie.</li>
+                                <li>Anlernen und Trainieren neuer Mitarbeiter.</li>
+                                <li>Optimierung von Arbeitsabläufen zur Effizienzsteigerung, inklusive Implementierung neuer digitaler Erfassungsmethoden.</li>
+                            </ul>
+                            <div class="mt-4 chart-container">
+                                <canvas id="besucherzahlenChart"></canvas>
+                            </div>
+                        </div>
+                        <span class="text-xs text-sky-600 mt-4 inline-block font-medium">Klicken für Details <i class="fas fa-chevron-down ml-1 transition-transform group-hover:rotate-180"></i></span>
+                    </div>
+                </div>
+                <div class="mb-12 timeline-item cursor-pointer group" onclick="toggleTimelineItem(this)">
+                    <div class="absolute w-8 h-8 bg-sky-500 rounded-full -left-[18px] mt-1.5 border-4 border-white shadow-md group-hover:scale-110 transition-transform flex items-center justify-center timeline-dot-pulse">
+                        <i class="fas fa-handshake text-white text-sm"></i>
+                    </div>
+                    <div class="ml-12 p-6 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:-translate-y-1">
+                        <h3 class="text-xl md:text-2xl font-semibold mb-1">Selbstständiger Handel / Reselling</h3>
+                        <p class="text-sm text-slate-500 mb-3">Elektronikartikel | Seit dem 16. Lebensjahr</p>
+                        <div class="content mt-2 leading-relaxed">
+                            <p>Erzielung einer konsistenten Gewinnmarge von **25-35%** durch geschickte Verhandlungführung und strategischen Vertrieb über digitale Plattformen.</p>
+                        </div>
+                        <span class="text-xs text-sky-600 mt-4 inline-block font-medium">Klicken für Details <i class="fas fa-chevron-down ml-1 transition-transform group-hover:rotate-180"></i></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="projekte" class="mb-24 section-fade-in">
+            <h2 class="text-3xl md:text-4xl font-bold text-sky-700 mb-12 text-center relative pb-4">
+                Projekte & Besondere Leistungen
+                <span class="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-sky-500 rounded-full animate-line-expand"></span>
+            </h2>
+            <p class="text-center text-slate-600 mb-12 max-w-3xl mx-auto text-lg leading-relaxed">Meine Projekte zeigen meine Initiative, meine Fähigkeit zur praktischen Anwendung von Technologie und mein Engagement, über den Tellerrand hinauszublicken. Besonders die Konzeption und Umsetzung eigener Ideen treibt mich an.</p>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow transform hover:-translate-y-1 cursor-pointer project-card" onclick="openModal('smartHomeModal')">
+                    <i class="fas fa-home fa-4x mb-6 project-icon"></i>
+                    <h3 class="text-xl font-semibold mb-3">Smart Home Projekt</h3>
+                    <p class="text-base leading-relaxed">Automatisierung diverser Funktionen mittels Raspberry Pis und Entwicklung einer eigenen App.</p>
+                </div>
+                <div class="p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow transform hover:-translate-y-1 cursor-pointer project-card" onclick="openModal('abiturKomiteeModal')">
+                     <i class="fas fa-users fa-4x mb-6 project-icon"></i>
+                    <h3 class="text-xl font-semibold mb-3">Mitglied des Abitur-Komitees</h3>
+                    <p class="text-base leading-relaxed">Akquise von 3 Kooperationen und Generierung von Medienpräsenz.</p>
+                </div>
+                <div class="p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow transform hover:-translate-y-1 cursor-pointer project-card" onclick="openModal('ocrKonzeptModal')">
+                    <i class="fas fa-cogs fa-4x mb-6 project-icon"></i>
+                    <h3 class="text-xl font-semibold mb-3">Konzept für OCR-Lagerverwaltung</h3>
+                    <p class="text-base leading-relaxed">Innovative Optimierung der Lagerbestandsverwaltung mittels OCR.</p>
+                </div>
+                 <div class="p-8 rounded-lg shadow-lg hover:shadow-xl transition-shadow transform hover:-translate-y-1 cursor-pointer project-card" onclick="openModal('veranstaltungenModal')">
+                    <i class="fas fa-calendar-alt fa-4x mb-6 project-icon"></i>
+                    <h3 class="text-xl font-semibold mb-3">Planung von Veranstaltungen</h3>
+                    <p class="text-base leading-relaxed">Organisation von Events und Aufbau einer Motorrad-Community.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="kompetenzen" class="mb-24 section-fade-in">
+            <h2 class="text-3xl md:text-4xl font-bold text-sky-700 mb-12 text-center relative pb-4">
+                Kompetenzen
+                <span class="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-sky-500 rounded-full animate-line-expand"></span>
+            </h2>
+             <p class="text-center text-slate-600 mb-12 max-w-3xl mx-auto text-lg leading-relaxed">Mein Kompetenzprofil umfasst eine Mischung aus technischen Fähigkeiten, methodischem Vorgehen und starken Sozialkompetenzen, die ich kontinuierlich erweitere und in der Praxis anwende.</p>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="p-8 rounded-lg shadow-lg skill-card">
+                    <h3 class="text-xl font-semibold mb-4 border-b-2 pb-3"><i class="fas fa-laptop-code mr-3"></i>IT & Digitale Affinität</h3>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li>Programmierkenntnisse: Autodidaktisch (Python, JavaScript - bitte anpassen)</li>
+                        <li>Systeme & Tools: Raspberry Pis, Hausautomatisierung, App-Entwicklung, CRM-Systeme, Online-Marketing-Tools</li>
+                        <li>Konzeptentwicklung: OCR-Lagerverwaltung, digitale Prozessoptimierung</li>
+                        <li>Software: Video-Editing, -Kreation, -Design (Adobe Suite - bitte anpassen)</li>
+                    </ul>
+                </div>
+                <div class="p-8 rounded-lg shadow-lg skill-card">
+                    <h3 class="text-xl font-semibold mb-4 border-b-2 pb-3"><i class="fas fa-clipboard-list mr-3"></i>Methodenkompetenzen</h3>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li>Analytische Fähigkeiten & Problemlösung</li>
+                        <li>Strategisches Denken & Top-Down Analyse</li>
+                        <li>Projektmanagement</li>
+                        <li>Prozessoptimierung</li>
+                        <li>Umfassende Planung & Organisation</li>
+                        <li>Detaillierte Recherche</li>
+                    </ul>
+                </div>
+                <div class="p-8 rounded-lg shadow-lg skill-card">
+                    <h3 class="text-xl font-semibold mb-4 border-b-2 pb-3"><i class="fas fa-users-cog mr-3"></i>Sozialkompetenzen</h3>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li>Unternehmerischer Geist & Proaktivität</li>
+                        <li>Teamfähigkeit & Führung</li>
+                        <li>Hohe Lernbereitschaft & Wissensdurst</li>
+                        <li>Resilienz & Durchhaltevermögen</li>
+                        <li>Kundenorientierung & Beziehungsmanagement</li>
+                        <li>Interkulturelle Kompetenz</li>
+                    </ul>
+                </div>
+                 <div class="p-8 rounded-lg shadow-lg sm:col-span-2 lg:col-span-1 lg:col-start-2 skill-card">
+                    <h3 class="text-xl font-semibold mb-4 border-b-2 pb-3"><i class="fas fa-language mr-3"></i>Sprachen</h3>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li>Deutsch: Muttersprache</li>
+                        <li>Englisch: Fließend (C1 - Cambridge CAE Zertifikat)</li>
+                        <li>Spanisch: Grundkenntnisse</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="extras" class="mb-24 section-fade-in">
+            <h2 class="text-3xl md:text-4xl font-bold text-sky-700 mb-12 text-center relative pb-4">
+                Zertifikate & Internationales
+                <span class="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-sky-500 rounded-full animate-line-expand"></span>
+            </h2>
+            <p class="text-center text-slate-600 mb-12 max-w-3xl mx-auto text-lg leading-relaxed">Zertifikate belegen meine Qualifikationen, während meine internationalen Erfahrungen meinen Horizont erweitert und meine Anpassungsfähigkeit gestärkt haben.</p>
+            <div class="grid sm:grid-cols-2 gap-8">
+                <div class="p-8 rounded-lg shadow-lg" style="background-color: #181818; border: 1px solid #333; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+                    <h3 class="text-xl font-semibold text-sky-600 mb-4"><i class="fas fa-certificate mr-3 text-sky-500"></i>Zertifikate & Weiterbildungen</h3>
+                    <ul class="list-disc list-inside text-slate-100 space-y-2">
+                        <li>Smart Serve Ontario Certificate (gültig bis 10.11.2027)</li>
+                        <li>Cambridge CAE Zertifikat (Niveau C1)</li>
+                    </ul>
+                    <h4 class="font-semibold mt-6 mb-2 text-slate-100">Angestrebte Zertifizierungen:</h4>
+                    <p class="text-base text-slate-200">CFA, FMVA, PMP, FRM, CPA, CMA, CSCP, ISM.</p>
+                    <p class="text-sm text-slate-400 mt-2 italic">Dies unterstreicht mein Engagement für Spezialisierung in Wirtschaft und Projektmanagement.</p>
+                </div>
+                <div class="p-8 rounded-lg shadow-lg" style="background-color: #181818; border: 1px solid #333; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+                    <h3 class="text-xl font-semibold text-sky-600 mb-4"><i class="fas fa-globe-americas mr-3 text-sky-500"></i>Internationale Erfahrung</h3>
+                    <ul class="list-disc list-inside text-slate-100 space-y-2">
+                        <li>Einjähriger Aufenthalt (Studium & Co-op Work Experience) in Toronto, Kanada <i class="fab fa-canadian-maple-leaf text-red-500 ml-1"></i>.</li>
+                        <li>Frühe Prägung durch Erfahrungen in der Türkei <span class="inline-block ml-1">🇹🇷</span>.</li>
+                        <li>Entwicklung einer ausgeprägten interkulturellen Perspektpektive und Anpassungsfähigkeit.</li>
+                    </ul>
+                    <div class="mt-4 text-center">
+                        <img class="timeline-image rounded-lg shadow-md mx-auto max-w-full h-auto object-contain harmonized-image" style="max-height: 200px;" data-image-key="nelsonCanada" alt="Nelson Ishag in Toronto">
+                        <p class="text-xs text-slate-400 mt-2">Erkundung neuer Horizonte in Toronto.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-slate-800 text-white text-center p-8" style="background-color: #121212; border-top: 1px solid #222;">
+        <p class="text-lg">&copy; <span id="currentYear"></span> Nelson Ishag. Alle Rechte vorbehalten.</p>
+        <p class="text-sm text-slate-400 mt-2">Erstellt für die Bewerbung zum Dualen Studium Wirtschaftsinformatik.</p>
+    </footer>
+
+    <div id="easterEggMessageBox" class="easter-egg-box hidden">
+        <span>Vroom Vroom! Entdecken Sie meine Leidenschaft für Motorräder! 🏍️</span>
+        <button class="close-btn" onclick="document.getElementById('easterEggMessageBox').classList.remove('show', 'flex'); document.getElementById('easterEggMessageBox').classList.add('hidden');">&times;</button>
+    </div>
+
+    <div id="smartHomeModal" class="modal fixed inset-0 items-center justify-center p-4 z-[100] transition-opacity duration-300" onclick="closeModalOnOutsideClick(event, 'smartHomeModal')">
+        <div class="p-8 rounded-xl shadow-2xl max-w-lg w-full transform transition-all duration-300">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-sky-600">Smart Home Projekt</h3>
+                <button onclick="closeModal('smartHomeModal')" class="text-slate-400 hover:text-slate-200 text-3xl leading-none" aria-label="Modal schließen">&times;</button>
+            </div>
+            <div class="mb-4 text-center">
+                <img class="modal-image rounded-lg shadow-md mx-auto max-w-full h-auto object-contain harmonized-image" style="max-height: 250px;" data-image-key="smartHome" alt="Smart Home Projekt">
+                <p class="text-xs text-slate-400 mt-2">Kreativität und das Nähren neuer Ideen – auch im Smart Home.</p>
+            </div>
+            <p class="mb-4 leading-relaxed">Gemeinsam mit einem Freund habe ich unser Zuhause in ein Smart Home verwandelt.</p>
+            <ul class="list-disc list-inside space-y-2 mb-6">
+                <li>Automatisierung diverser Funktionen (Kaffeemaschine, Garagentor, Lichter) mittels Raspberry Pis.</li>
+                <li>Eigenständige Programmierung der Steuerungslogik.</li>
+                <li>Entwicklung einer eigenen App zur komfortablen Bedienung des Systems.</li>
+            </ul>
+            <p class="font-semibold mb-2">Angewandte Fähigkeiten:</p>
+            <p class="text-sm text-slate-300">Praktische Anwendung digitaler Technologien, Problemlösung, Programmierung (Python - anpassen!), Systemintegration, App-Entwicklung (Grundlagen).</p>
+        </div>
+    </div>
+
+    <div id="abiturKomiteeModal" class="modal fixed inset-0 items-center justify-center p-4 z-[100] transition-opacity duration-300" onclick="closeModalOnOutsideClick(event, 'abiturKomiteeModal')">
+        <div class="p-8 rounded-xl shadow-2xl max-w-lg w-full transform transition-all duration-300">
+            <div class="flex justify-between items-center mb-6">
+                 <h3 class="text-2xl font-bold text-sky-600">Mitglied des Abitur-Komitees</h3>
+                <button onclick="closeModal('abiturKomiteeModal')" class="text-slate-400 hover:text-slate-200 text-3xl leading-none" aria-label="Modal schließen">&times;</button>
+            </div>
+            <div class="mb-4 text-center">
+                <img class="modal-image rounded-lg shadow-md mx-auto max-w-full h-auto object-contain harmonized-image" style="max-height: 250px;" data-image-key="nelsonCertificate" alt="Erfolgreiche Kooperationen und Teamarbeit im Abitur-Komitee">
+                <p class="text-xs text-slate-400 mt-2">Erfolgreiche Kooperationen und Teamarbeit im Abitur-Komitee.</p>
+            </div>
+            <p class="mb-4 leading-relaxed">Als Mitglied des Abitur-Komitees konnte ich meine organisatorischen und kommunikativen Fähigkeiten unter Beweis stellen.</p>
+            <ul class="list-disc list-inside space-y-2 mb-6">
+                <li>Erfolgreiche Akquise von 3 Kooperationen (Dvag, Sparkasse, Orthomol) innerhalb von nur 4 Wochen.</li>
+                <li>Generierung von Medienpräsenz in der Rheinischen Post (RP).</li>
+            </ul>
+            <p class="font-semibold mb-2">Angewandte Fähigkeiten:</p>
+            <p class="text-sm text-slate-300">Organisationstalent, Überzeugungsfähigkeit, Verhandlungsgeschick, Projektmanagement, Teamführung, Kommunikation.</p>
+        </div>
+    </div>
+    
+    <div id="ocrKonzeptModal" class="modal fixed inset-0 items-center justify-center p-4 z-[100] transition-opacity duration-300" onclick="closeModalOnOutsideClick(event, 'ocrKonzeptModal')">
+        <div class="p-8 rounded-xl shadow-2xl max-w-lg w-full transform transition-all duration-300">
+            <div class="flex justify-between items-center mb-6">
+                 <h3 class="text-2xl font-bold text-sky-600">Konzept für OCR-Lagerverwaltung</h3>
+                <button onclick="closeModal('ocrKonzeptModal')" class="text-slate-400 hover:text-slate-200 text-3xl leading-none" aria-label="Modal schließen">&times;</button>
+            </div>
+            <div class="mb-4 text-center">
+                <img class="modal-image rounded-lg shadow-md mx-auto max-w-full h-auto object-contain harmonized-image" style="max-height: 250px;" data-image-key="ocrConcept" alt="Abstrakte Darstellung eines OCR-Konzepts">
+                <p class="text-xs text-slate-400 mt-2">Visionäre Ideen für effiziente Lagerverwaltung.</p>
+            </div>
+            <p class="mb-4 leading-relaxed">Eigenständige Entwicklung eines innovativen Konzepts zur Optimierung der Lagerbestandsverwaltung im Einzelhandel.</p>
+            <ul class="list-disc list-inside space-y-2 mb-6">
+                <li>Problemidentifikation: Ineffizienzen bei der manuellen Bestandsaufnahme.</li>
+                <li>Lösungsansatz: Einsatz von Optical Character Recognition (OCR) zur automatisierten Erfassung von Produktinformationen.</li>
+                <li>Ziel: Reduzierung von Fehlern, Beschleunigung des Prozesses, Verbesserung der Datenqualität.</li>
+            </ul>
+            <p class="font-semibold mb-2">Demonstrierte Fähigkeiten:</p>
+            <p class="text-sm text-slate-300">Analytisches Denken, Problemlösungskompetenz, Innovationsgeist, konzeptionelles Arbeiten, Verständnis für digitale Technologien und deren Anwendungspotenzial in Geschäftsprozessen.</p>
+        </div>
+    </div>
+
+    <div id="veranstaltungenModal" class="modal fixed inset-0 items-center justify-center p-4 z-[100] transition-opacity duration-300" onclick="closeModalOnOutsideClick(event, 'veranstaltungenModal')">
+        <div class="p-8 rounded-xl shadow-2xl max-w-lg w-full transform transition-all duration-300">
+            <div class="flex justify-between items-center mb-6">
+                 <h3 class="text-2xl font-bold text-sky-600">Planung von Veranstaltungen</h3>
+                <button onclick="closeModal('veranstaltungenModal')" class="text-slate-400 hover:text-slate-200 text-3xl leading-none" aria-label="Modal schließen">&times;</button>
+            </div>
+            <div class="mb-4 text-center">
+                <img class="modal-image rounded-lg shadow-md mx-auto max-w-full h-auto object-contain harmonized-image" style="max-height: 250px;" data-image-key="events" alt="Zelt am See bei Sonnenuntergang">
+                <p class="text-xs text-slate-400 mt-2">Gemeinschaft, Abenteuer und Organisation im Freien.</p>
+            </div>
+            <p class="mb-4 leading-relaxed">Neben schulischen und beruflichen Aktivitäten engagiere ich mich in der Organisation und Durchführung von Events.</p>
+            <ul class="list-disc list-inside space-y-2 mb-6">
+                <li>Umfassende Planung und Durchführung von Hüttenbauten und Partys, inklusive Budgetierung und Ressourcenmanagement.</li>
+                <li class="flex items-center">
+                    Aufbau einer Motorrad-Community von 10 auf 50 Mitgliedern durch Organisation gemeinsamer Ausfahrten und Treffen.
+                    <i class="fas fa-motorcycle text-xl motorcycle-icon-trigger" onclick="showEasterEgg(event)"></i>
+                </li>
+            </ul>
+            <p class="font-semibold mb-2">Angewandte Fähigkeiten:</p>
+            <p class="text-sm text-slate-300">Organisation, Planung, Budgetierung, Community Building, Stakeholder-Management, Teamführung, Kommunikationsfähigkeit.</p>
+        </div>
+    </div>
+
+
+    <script>
+        // Objekt zum Speichern der Bildpfade
+        const imagePaths = {
+            heroBg: "Bild01.jpg", // Hintergrundbild Hero-Sektion
+            profilePicture: "Bild11.jpg", // Profilbild
+            nelsonCertificate: "Bild05.jpg", // Bild für Zertifikat/Abitur Komitee
+            smartHome: "first.png", // Bild für Smart Home Projekt
+            ocrConcept: "ocr.jpg", // Bild für OCR Konzept
+            events: "Bild02.jpg", // Bild für Veranstaltungen
+            nelsonCanada: "Bild07.jpg" // Bild für Internationale Erfahrung
+
+        };
+
+        // Funktion zum dynamischen Laden von Bildern und Anwenden der Harmonization
+        function loadDynamicImages() {
+            // Hero Hintergrundbild
+            const heroBgImage = document.getElementById('hero-bg-image');
+            if (heroBgImage) {
+                heroBgImage.src = imagePaths.heroBg;
+                heroBgImage.onload = () => heroBgImage.classList.add('loaded');
+            }
+
+            // Profilbild
+            const profilePicture = document.getElementById('profile-picture');
+            if (profilePicture) {
+                profilePicture.src = imagePaths.profilePicture;
+                profilePicture.onload = () => profilePicture.classList.add('loaded');
+            }
+
+            // Bilder in Timeline-Elementen
+            document.querySelectorAll('.timeline-image').forEach(img => {
+                const imageKey = img.dataset.imageKey;
+                if (imagePaths[imageKey]) {
+                    img.src = imagePaths[imageKey];
+                    img.onload = () => img.classList.add('loaded');
+                }
+            });
+
+            // Bilder in Modal-Fenstern
+            document.querySelectorAll('.modal-image').forEach(img => {
+                const imageKey = img.dataset.imageKey;
+                if (imagePaths[imageKey]) {
+                    img.src = imagePaths[imageKey];
+                    img.onload = () => img.classList.add('loaded');
+                }
+            });
+        }
+
+        // Event Listener für sanftes Scrollen der Navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                    // Aktualisiere den aktiven Navigationspunkt nach dem Scrollen
+                    setTimeout(() => {
+                        updateActiveNavLink();
+                    }, 700); // Kurze Verzögerung, um das Scrollen abzuwarten
+                }
+            });
+        });
+
+        // Funktion zum Umschalten der Timeline-Elemente
+        function toggleTimelineItem(element) {
+            element.classList.toggle('open');
+        }
+
+        // Funktionen zum Öffnen und Schließen von Modals
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('open');
+                document.body.classList.add('overflow-hidden'); // Verhindert Scrollen des Hintergrunds
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('open');
+                document.body.classList.remove('overflow-hidden'); // Ermöglicht Scrollen des Hintergrunds
+            }
+        }
+        
+        // Schließt Modal beim Klicken außerhalb des Modal-Inhalts
+        function closeModalOnOutsideClick(event, modalId) {
+            const modal = document.getElementById(modalId);
+            if (event.target === modal) { // Prüft, ob der Klick auf dem Modal-Hintergrund war
+                closeModal(modalId);
+            }
+        }
+
+        // Chart.js für Besucherzahlen
+        const besucherzahlenCtx = document.getElementById('besucherzahlenChart');
+        if (besucherzahlenCtx) {
+            new Chart(besucherzahlenCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Vorher (Ø)', 'Nachher (Ø)'],
+                    datasets: [{
+                        label: 'Tägliche Besucher im Testzentrum',
+                        data: [80, 175],
+                        backgroundColor: [
+                            'rgba(14, 165, 233, 0.8)', // Sky Blue
+                            'rgba(59, 130, 246, 0.8)'  // Indigo Blue
+                        ],
+                        borderColor: [
+                            'rgb(14, 165, 233)',
+                            'rgb(59, 130, 246)'
+                        ],
+                        borderWidth: 1,
+                        borderRadius: 5,
+                        hoverBackgroundColor: [
+                            'rgba(14, 165, 233, 1)',
+                            'rgba(59, 130, 246, 1)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Anzahl Besucher', color: '#CBD5E1', font: { size: 14, weight: 'bold' } }, /* Textfarbe angepasst */
+                            ticks: { color: '#CBD5E1' }, /* Textfarbe angepasst */
+                            grid: { color: '#333', drawBorder: false } /* Gitterlinienfarbe angepasst */
+                        },
+                        x: {
+                            ticks: { color: '#CBD5E1' }, /* Textfarbe angepasst */
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                            titleColor: '#F1F5F9',
+                            bodyColor: '#F1F5F9',
+                            borderColor: '#0EA5E9',
+                            borderWidth: 1,
+                            cornerRadius: 5,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1500, 
+                        easing: 'easeInOutQuart' 
+                    }
+                }
+            });
+        }
+        
+        // Setzt das aktuelle Jahr im Footer
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        // Intersection Observer für Sektionen-Fade-In
+        const sections = document.querySelectorAll('.section-fade-in');
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1 
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                } else {
+                    // entry.target.classList.remove('visible'); // Optional: Sektion wieder ausblenden
+                }
+            });
+        }, observerOptions);
+
+        sections.forEach(section => {
+            observer.observe(section);
+        });
+
+        // Navigationsleiste und Scroll-Fortschrittsanzeige
+        const navLinks = document.querySelectorAll('nav .nav-item');
+        const spaSections = document.querySelectorAll('main section');
+
+        function updateActiveNavLink() {
+            let currentSectionId = '';
+            spaSections.forEach(section => {
+                const sectionTop = section.offsetTop - 80; 
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= sectionTop && pageYOffset < (sectionTop + sectionHeight)) { 
+                    currentSectionId = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${currentSectionId}`) {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', () => {
+            updateActiveNavLink(); 
+
+            // Scroll-Fortschrittsanzeige
+            const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+            const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (scrollTop / scrollHeight) * 100;
+            document.getElementById('scroll-progress-bar').style.width = scrolled + '%';
+
+            // Parallax-Effekt für Hero-Hintergrundbild
+            const heroBgImage = document.getElementById('hero-bg-image');
+            if (heroBgImage) {
+                const speed = parseFloat(heroBgImage.dataset.parallaxSpeed);
+                heroBgImage.style.transform = `translateY(${scrollTop * speed}px)`;
+            }
+        });
+
+        // Easter Egg Funktion
+        function showEasterEgg(event) {
+            event.stopPropagation(); // Verhindert, dass das Modal geschlossen wird
+            const messageBox = document.getElementById('easterEggMessageBox');
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('show', 'flex');
+
+            setTimeout(() => {
+                messageBox.classList.remove('show', 'flex');
+                messageBox.classList.add('hidden');
+            }, 5000); // Nachricht verschwindet nach 5 Sekunden
+        }
+
+
+        // Initialer Aufruf beim Laden der Seite
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDynamicImages(); 
+            updateActiveNavLink(); 
+        });
+    </script>
+</body>
+</html>
